@@ -1,0 +1,5 @@
+# This directory intentionally contains no revision yet.
+#
+# The full-schema baseline will be the first file placed here, and only after a
+# separate authorization. Alembic requires the directory to exist, hence this
+# placeholder.

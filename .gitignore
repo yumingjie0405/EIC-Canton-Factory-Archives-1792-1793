@@ -50,8 +50,11 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+# Python packaging output. Anchored with a leading slash so only the
+# repository-root ``lib/`` is ignored: an unanchored ``lib/`` also matched
+# ``frontend/src/lib/`` and silently hid the frontend source files from Git.
+/lib/
+/lib64/
 parts/
 sdist/
 var/
@@ -158,3 +161,12 @@ ocr_training/exports/
 # Public deployment runtime secrets.
 deploy/secrets/
 deploy/.env
+
+# ============================================================
+# 本地临时产物与个人笔记（不入库）
+# ============================================================
+# scratch/: 调试脚本、运行日志（日志可能含 prompt 与请求片段）
+# 个人文件/: 个人规划、验收报告、操作手册（含形似密钥的占位符）
+scratch/
+个人文件/
+

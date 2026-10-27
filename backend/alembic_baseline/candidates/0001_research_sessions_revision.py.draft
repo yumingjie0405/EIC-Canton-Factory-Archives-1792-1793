@@ -1,0 +1,80 @@
+"""add research_sessions (DRAFT - not installed, not applied)
+
+WHY THIS IS A DRAFT
+-------------------
+``backend/alembic_baseline/versions/`` currently contains no revision at all, and
+the full-schema baseline for the existing database has not been verified
+(Stage 8 Phase-A is BLOCKED). Installing this file as-is would therefore create a
+**second root revision** (``down_revision = None``) claiming the database starts
+empty, which is exactly the duplicate-root / unexpected-head situation that must
+be avoided.
+
+BLOCKING ITEM (single): no verified full-schema baseline revision exists, so this
+revision has no valid ``down_revision`` target.
+
+INSTALLATION CHECKLIST (after the baseline revision is reviewed and installed)
+------------------------------------------------------------------------------
+1. set ``revision`` to the id chosen by ``alembic revision``;
+2. set ``down_revision`` to the baseline revision id (this file currently uses the
+   sentinel ``"BASELINE_REVISION_ID"`` so it cannot be applied by accident);
+3. move the file into ``backend/alembic_baseline/versions/``;
+4. re-run ``alembic -c backend/alembic_baseline.ini heads`` and confirm exactly one head.
+
+The DDL below is generated from ``app/models/research.py`` with the PostgreSQL
+dialect compiler, so it matches the ORM model byte for byte.
+"""
+from alembic import op
+
+revision = "0001_research_sessions"
+down_revision = "BASELINE_REVISION_ID"  # sentinel: must be replaced with the real baseline head
+branch_labels = None
+depends_on = None
+
+
+DDL = """
+CREATE TABLE research_sessions (
+	id SERIAL NOT NULL, 
+	mode VARCHAR(16) NOT NULL, 
+	question TEXT NOT NULL, 
+	answer TEXT NOT NULL, 
+	status VARCHAR(24) NOT NULL, 
+	evidence_sufficient BOOLEAN NOT NULL, 
+	generation_mode VARCHAR(32), 
+	model_name VARCHAR(128), 
+	failure_reason VARCHAR(64), 
+	failure_message TEXT, 
+	failure_detail TEXT, 
+	citation_valid BOOLEAN, 
+	citation_invalid_ids JSON, 
+	citation_available_count INTEGER, 
+	sources JSON NOT NULL, 
+	entities JSON, 
+	relationships JSON, 
+	intent JSON, 
+	warnings JSON, 
+	elapsed_ms FLOAT, 
+	created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+	updated_at TIMESTAMP WITHOUT TIME ZONE, 
+	PRIMARY KEY (id), 
+	CONSTRAINT researchmode CHECK (mode IN ('rag', 'agent')), 
+	CONSTRAINT researchstatus CHECK (status IN ('completed', 'degraded', 'insufficient_evidence', 'failed'))
+);
+
+CREATE INDEX ix_research_sessions_created_at ON research_sessions (created_at);
+
+CREATE INDEX ix_research_sessions_mode_created_at ON research_sessions (mode, created_at);
+
+CREATE INDEX ix_research_sessions_status ON research_sessions (status);
+"""
+
+
+def upgrade() -> None:
+    op.execute(DDL)
+
+
+def downgrade() -> None:
+    raise RuntimeError(
+        "downgrade is not supported for the baseline chain; restore from a verified "
+        "backup instead of rolling back (see "
+        "docs/implementation/stage8_phaseA_R1_0_4_6_downgrade_safety.md)"
+    )

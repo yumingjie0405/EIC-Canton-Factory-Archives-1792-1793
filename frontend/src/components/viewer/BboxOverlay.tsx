@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 interface BboxOverlayProps {
   blocks: Block[];
   selectedBlockId: number | null;
+  targetBlockId?: number | null;
   onBlockClick: (block: Block) => void;
   imageWidth: number;
   imageHeight: number;
@@ -18,6 +19,7 @@ interface BboxOverlayProps {
 export function BboxOverlay({
   blocks,
   selectedBlockId,
+  targetBlockId,
   onBlockClick,
   imageWidth,
   imageHeight,
@@ -69,16 +71,25 @@ export function BboxOverlay({
           className={cn(
             "group absolute overflow-visible rounded-md border-2 pointer-events-auto transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2",
             getLabelColor(block.block_label),
-            selectedBlockId === block.id
-              ? "border-primary bg-primary/15 shadow-none"
+            block.id === targetBlockId
+              ? "border-indigo-600 bg-indigo-500/25 ring-4 ring-indigo-500/40 shadow-[0_0_15px_rgba(79,70,229,0.5)] z-20"
+              : selectedBlockId === block.id
+              ? "border-primary bg-primary/15 shadow-[0_0_0_4px_rgba(99,102,241,0.18)] z-10"
               : "hover:border-primary/80 hover:bg-primary/10"
           )}
           style={getBlockStyle(block)}
           onClick={() => onBlockClick(block)}
           title={`${block.block_label || "text"} - Block ${block.block_index + 1}`}
         >
-          <span className="absolute -top-6 left-0 rounded-full bg-slate-950 px-2 py-1 text-[11px] font-medium text-white shadow-lg">
-            #{block.block_index + 1}
+          <span
+            className={cn(
+              "absolute -top-6 left-0 rounded-full px-2 py-0.5 text-[11px] font-medium shadow-lg transition-all",
+              block.id === targetBlockId
+                ? "bg-indigo-600 text-white font-semibold ring-2 ring-white/80"
+                : "bg-slate-950 text-white"
+            )}
+          >
+            {block.id === targetBlockId ? `★ 目标切片 #${block.id}` : `#${block.block_index + 1}`}
           </span>
           <span className="absolute inset-0 rounded-[inherit] bg-white/10 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100" />
         </button>

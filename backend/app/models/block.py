@@ -10,6 +10,7 @@ from app.database import Base
 
 if TYPE_CHECKING:
     from app.models.page import Page
+    from app.models.kg.mention import PersonMention
 
 
 class ReviewStatus(str, enum.Enum):
@@ -51,6 +52,7 @@ class Block(Base):
 
     # Relationships
     page = relationship("Page", back_populates="blocks")
+    mentions = relationship("PersonMention", back_populates="block")
     source_unit_spans = relationship("SourceUnitSpan", back_populates="block", cascade="all, delete-orphan")
     text_revisions = relationship("TextRevision", back_populates="block", cascade="all, delete-orphan")
 

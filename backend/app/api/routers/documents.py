@@ -21,6 +21,7 @@ from app.repositories import TaskRepository, PageRepository
 from app.tasks import run_ocr_task
 from app.schemas.task import TaskCreate
 from app.core import logger, DocumentNotFoundError
+from app.config import settings
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -30,13 +31,19 @@ async def upload_document(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
-    """Upload a new document (PDF or image)."""
+    """Upload a new document (PDF, image or Word .docx)."""
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided")
 
     content = await file.read()
     if not content:
         raise HTTPException(status_code=400, detail="Empty file")
+    if len(content) > settings.max_upload_file_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail="文件为 %.1f MB，超过单文件上限 %d MB。"
+            % (len(content) / (1024 * 1024), settings.max_upload_file_mb),
+        )
 
     service = DocumentService(db)
     try:

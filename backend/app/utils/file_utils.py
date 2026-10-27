@@ -45,6 +45,15 @@ def is_image(filename: str) -> bool:
     return get_file_extension(filename) in image_extensions
 
 
+def is_docx(filename: str) -> bool:
+    """Check if file is a Word document (Office Open XML).
+
+    Only ``.docx`` is supported: the legacy binary ``.doc`` format cannot be read
+    by python-docx and has no parser in this project.
+    """
+    return get_file_extension(filename) == ".docx"
+
+
 def save_upload_file(content: bytes, filename: str) -> Path:
     """Save uploaded file content to storage."""
     ensure_directories()

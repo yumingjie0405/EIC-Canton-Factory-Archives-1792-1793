@@ -1,0 +1,20 @@
+Independent Alembic environment for the full-schema baseline chain.
+
+This directory is NOT the legacy chain. The legacy migrations live in
+../alembic/versions/ and stay frozen with their own configuration
+(../alembic.ini) and their own version table (alembic_version).
+
+Facts about this environment
+----------------------------
+* driven by ../alembic_baseline.ini (or by `-n alembic_baseline`)
+* version_table = alembic_version_baseline  (no shared version state)
+* versions/ is intentionally empty: the baseline revision does not exist yet and
+  will only be created after a separate, explicit authorization
+* env.py calls app.migration_target_guard.apply_guard_to_config() before any
+  Engine is built, so an unauthorized target can never reach a connection
+
+Running anything requires an explicit allow-list, for example:
+
+    $env:EIC_MIGRATION_ALLOWED_TARGETS = "127.0.0.1:5432/ocr_platform_baseline_test"
+    $env:EIC_MIGRATIONS_ENABLED = "1"      # write commands only
+    alembic -c alembic_baseline.ini current

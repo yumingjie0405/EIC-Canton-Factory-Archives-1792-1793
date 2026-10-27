@@ -1,14 +1,23 @@
 """Block API routes."""
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
-from app.repositories import BlockRepository, TaskRepository, PageRepository
+from app.repositories import BlockRepository, DocumentRepository, TaskRepository, PageRepository
 from app.schemas import BlockResponse, BlockUpdate, TaskResponse, RunPolishRequest
+from app.schemas.block_context import BlockContextResponse
 from app.schemas.task import TaskCreate
 from app.models import TaskType
+from app.services.block_context_service import (
+    NEIGHBOUR_SCOPE,
+    NOTES,
+    build_block_context,
+    to_context_block,
+)
+from app.services.rag.answer_integrity import scrub_secrets
 from app.tasks import polish_block_task, polish_page_task, polish_document_task
 from app.tasks.gpt_tasks_batch import polish_document_batch_task
 from app.core import logger
@@ -23,6 +32,61 @@ def _validate_page_modes(request: RunPolishRequest) -> None:
             status_code=422,
             detail="Page and document polish support only ocr_correction mode",
         )
+
+
+@router.get("/{block_id}/context", response_model=BlockContextResponse)
+def get_block_context(
+    block_id: int = Path(..., ge=1, description="Cited block id"),
+    document_id: int = Query(..., ge=1, description="Document the citation claims to come from"),
+    window: int = Query(1, ge=0, le=3, description="Neighbour blocks before/after on the same page"),
+    db: Session = Depends(get_db),
+):
+    """Return the cited archival block and its same-page neighbours (read-only).
+
+    The block/document pair is validated server-side so a mismatched id
+    combination can never return text from another document. Only stored OCR
+    transcriptions are returned — the model-derived fields are excluded.
+    """
+    try:
+        block = BlockRepository(db).get_by_id(block_id)
+        if not block:
+            raise HTTPException(status_code=404, detail="Block not found")
+
+        page = PageRepository(db).get_by_id(block.page_id)
+        if page is None:
+            raise HTTPException(status_code=404, detail="Page for this block no longer exists")
+        if page.document_id != document_id:
+            raise HTTPException(
+                status_code=404,
+                detail="Block %d does not belong to document %d" % (block_id, document_id),
+            )
+
+        document = DocumentRepository(db).get_by_id(document_id)
+        if document is None:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        siblings = BlockRepository(db).get_by_page(block.page_id)
+        neighbours = build_block_context(block, siblings, window=window)
+    except HTTPException:
+        raise
+    except SQLAlchemyError as exc:
+        logger.error("Block context lookup failed: %s", scrub_secrets(str(exc)))
+        raise HTTPException(
+            status_code=503,
+            detail="档案原文暂时无法读取：数据库读取失败。",
+        )
+
+    return BlockContextResponse(
+        document_id=document_id,
+        document_name=document.original_filename or document.filename or "未命名档案",
+        page_id=page.id,
+        page_number=page.page_number,
+        block=to_context_block(block),
+        previous=neighbours["previous"],
+        next=neighbours["next"],
+        neighbour_scope=NEIGHBOUR_SCOPE,
+        notes=list(NOTES),
+    )
 
 
 @router.get("/{block_id}", response_model=BlockResponse)

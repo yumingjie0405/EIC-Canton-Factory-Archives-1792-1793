@@ -4,15 +4,50 @@ import json
 from pathlib import Path
 from typing import List
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
+
+
+class MissingDatabaseConfig(RuntimeError):
+    """Raised when no database URL is configured.
+
+    Deliberately a plain ``RuntimeError`` subclass raised at the point of
+    use (Engine creation), never at import time: importing the settings
+    module must not require a database.
+    """
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     # Database
-    database_url: str = "postgresql://postgres:postgres@localhost:5432/ocr_platform"
+    # DATABASE_URL HAS NO BUILT-IN DEFAULT: the previous fallback DSN embedded a
+    # database password. A missing value must fail loudly instead of silently
+    # connecting with a retired credential.
+    database_url: str = ""
     database_echo: bool = False
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def _normalise_database_url(cls, value: object) -> str:
+        if value is None:
+            return ""
+        return str(value).strip()
+
+    def require_database_url(self) -> str:
+        """Return the configured database URL, or fail with an actionable error.
+
+        The message never contains the URL itself, so it is safe to log.
+        """
+        url = (self.database_url or "").strip()
+        if not url:
+            raise MissingDatabaseConfig(
+                "DATABASE_URL is not configured. Set it in backend/.env "
+                "(git-ignored) or export it in the environment. There is no "
+                "built-in default: the application never falls back to a "
+                "retired credential."
+            )
+        return url
 
     # Redis
     redis_url: str = "redis://localhost:6379/0"
@@ -66,12 +101,65 @@ class Settings(BaseSettings):
     # Bounded research analysis calls; independent of OCR and RAG budgets.
     insights_request_timeout_seconds: float = 90.0
 
+    # Knowledge-graph auto research (triggered by a successful Word import)
+    #: Master switch. When off, no import/attach event may start an LLM run.
+    #: A deployed instance that wants the feature must enable it explicitly
+    #: (see ``.env.example``); groups additionally carry their own switch.
+    kg_auto_extract_on_import: bool = False
+    #: Per-run ceiling so an automatic run can never walk a whole book silently.
+    kg_auto_extract_budget_blocks: int = 400
+    #: Optional token ceiling for automatic runs (0 = no token limit).
+    kg_auto_extract_budget_tokens: int = 0
+    #: Automatic runs pause after this many consecutive block failures.
+    kg_auto_extract_max_consecutive_failures: int = 3
+
+    # Extraction budget safety (applies to *every* trigger, manual or automatic)
+    #: Used when a caller does not pass ``budget_blocks``: no run may be unbounded.
+    kg_extraction_default_budget_blocks: int = 200
+    #: Hard ceiling for one run's block budget (a request above it is refused).
+    kg_extraction_max_budget_blocks: int = 5000
+    #: Hard ceiling for one run's token budget when a caller supplies one.
+    kg_extraction_max_budget_tokens: int = 5000000
+    #: Model names recorded for local/mock models. Runs using them are marked as
+    #: mock-derived so their output is never presented as archival evidence.
+    kg_mock_model_names: str = "mock-model,mock"
+    #: Subset of the above that *reads the block text* and derives records by rules
+    #: (a validation stub). Kept separate from the constant mock so the two kinds of
+    #: test data can never be confused in the UI or in an audit.
+    kg_text_derived_model_names: str = "mock-text-stub"
+
+    @property
+    def kg_text_derived_model_name_set(self) -> set:
+        return {
+            name.strip().lower()
+            for name in (self.kg_text_derived_model_names or "").split(",")
+            if name.strip()
+        }
+
+    @property
+    def kg_mock_model_name_set(self) -> set:
+        return {
+            name.strip().lower()
+            for name in (self.kg_mock_model_names or "").split(",")
+            if name.strip()
+        }
+
     # Storage paths
     storage_path: str = "../storage"
     upload_path: str = "../storage/uploads"
     pages_path: str = "../storage/pages"
     results_path: str = "../storage/results"
     exports_path: str = "../storage/exports"
+
+    #: Hard ceiling for a single uploaded file. The browser has to hold the whole
+    #: multipart body in memory, so unbounded uploads fail client-side with no
+    #: server-side trace; exceeding this limit is reported explicitly (HTTP 413).
+    max_upload_file_bytes: int = 512 * 1024 * 1024
+
+    @property
+    def max_upload_file_mb(self) -> int:
+        """Ceiling expressed in whole megabytes, for user-facing messages."""
+        return max(1, self.max_upload_file_bytes // (1024 * 1024))
 
     # Server
     host: str = "0.0.0.0"
@@ -107,7 +195,10 @@ class Settings(BaseSettings):
         return Path(self.exports_path).resolve()
 
     class Config:
-        env_file = ".env"
+        _backend_dir = Path(__file__).resolve().parent.parent
+        # Only the real, git-ignored env file is read. ``.env.example`` is
+        # documentation and must never act as a silent source of credentials.
+        env_file = _backend_dir / ".env"
         env_file_encoding = "utf-8"
 
 

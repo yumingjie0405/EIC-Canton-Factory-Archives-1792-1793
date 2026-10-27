@@ -1,0 +1,8 @@
+Initial commit: OCR platform with coordinate fix and LLM retry optimization
+
+- Fix bbox coordinate mismatch (5% offset in 1087/1110 pages)
+- Implement two-pass LLM retry for TLS fault tolerance
+- Increase maxPixels to avoid unnecessary downsampling
+- Sanitize prompts and exclude sensitive data
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>

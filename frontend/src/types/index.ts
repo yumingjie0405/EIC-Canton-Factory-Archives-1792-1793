@@ -9,7 +9,7 @@ export interface Document {
   id: number;
   filename: string;
   original_filename: string;
-  file_type: "pdf" | "image";
+  file_type: "pdf" | "image" | "docx";
   file_size: number;
   page_count: number;
   full_markdown?: string;
@@ -182,3 +182,6 @@ export interface BlockUpdateRequest {
   translation_zh?: string;
   review_status?: ReviewStatus;
 }
+
+export * from "./kg";
+

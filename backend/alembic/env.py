@@ -8,7 +8,6 @@ from alembic import context
 
 # Import the base and all models
 from app.database import Base
-from app.config import settings
 
 # Import all models to ensure they are registered with Base
 from app.models import (
@@ -25,8 +24,13 @@ from app.models import (
 # access to the values within the .ini file in use.
 config = context.config
 
-# Override sqlalchemy.url with the one from settings
-config.set_main_option("sqlalchemy.url", settings.database_url)
+# Target protection (same rule as alembic_baseline): the run is refused unless the
+# database is allow-listed and explicitly authorized, and the checked URL is written
+# back into this config so every later read uses exactly the validated target.
+# Never point this chain at the product database by accident.
+from app.migration_target_guard import apply_guard_to_config
+
+apply_guard_to_config(config)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

@@ -19,6 +19,16 @@ export async function request<T>(
   });
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
+    // The V2 workbench needs its own schema (pgvector + `alembic -c alembic.ini upgrade
+    // heads`). Until that exists every call answers with a bare "Internal server error";
+    // say what is actually missing instead of echoing an opaque message.
+    if (response.status >= 500) {
+      throw new Error(
+        "V2 知识库尚未启用：数据库缺少 V2 表（需要 pgvector 扩展，并执行 "
+          + "`alembic -c alembic.ini upgrade heads`）。V1 功能（人物图谱 / 知识审核 / "
+          + "研究流程 / 智能问答 / AI 研究员）不受影响。",
+      );
+    }
     throw new Error(
       typeof error.detail === "string"
         ? error.detail

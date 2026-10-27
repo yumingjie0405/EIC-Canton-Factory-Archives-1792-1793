@@ -58,6 +58,17 @@ async function fetchApi<T>(
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
     const detail = typeof error.detail === "string" ? error.detail : undefined;
+    // The V2 knowledge workbench needs its own schema (created by `alembic -c alembic.ini
+    // upgrade heads` on a pgvector-enabled database). Until that has been done every V2
+    // call fails with a bare "Internal server error"; say what is actually missing.
+    if (response.status >= 500 && endpoint.startsWith("/v2/")) {
+      throw new ApiError(
+        response.status,
+        "V2 知识库尚未启用：数据库缺少 V2 表（需要 pgvector 扩展，并执行 "
+          + "`alembic -c alembic.ini upgrade heads`）。V1 功能（人物图谱 / 知识审核 / "
+          + "研究流程 / 智能问答 / AI 研究员）不受影响。",
+      );
+    }
     throw new ApiError(
       response.status,
       error.error?.message || detail || response.statusText,

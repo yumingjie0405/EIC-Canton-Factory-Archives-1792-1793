@@ -13,10 +13,12 @@ from app.schemas import (
     DocumentListResponse,
 )
 from app.repositories import DocumentRepository
+from app.services.docx_service import DocxParseError, create_docx_document
 from app.utils import (
     save_upload_file,
     is_pdf,
     is_image,
+    is_docx,
     delete_document_files,
 )
 from app.core import logger, FileProcessingError
@@ -43,7 +45,16 @@ class DocumentService:
 
         Returns:
             Created document
+
+        ``.docx`` files are ingested straight to text blocks (no OCR); PDFs and
+        images are stored for the OCR pipeline.
         """
+        if is_docx(filename):
+            try:
+                return create_docx_document(self.db, filename, content)
+            except DocxParseError as exc:
+                raise FileProcessingError(str(exc)) from None
+
         # Validate file type
         if not (is_pdf(filename) or is_image(filename)):
             raise FileProcessingError(f"Unsupported file type: {filename}")

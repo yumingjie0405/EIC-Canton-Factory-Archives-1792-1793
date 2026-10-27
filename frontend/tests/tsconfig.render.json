@@ -1,0 +1,19 @@
+{
+  "//": "Compiles the citation components to CommonJS so Node can server-render them in tests. No bundler, no new dependency.",
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "jsx": "react-jsx",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": false,
+    "outDir": "../node_modules/.cache/eic-render",
+    "rootDir": "..",
+    "baseUrl": "..",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+    "types": ["node"]
+  },
+  "include": ["../src/components/rag/CitationRichText.tsx", "../src/lib/citations.ts"]
+}
